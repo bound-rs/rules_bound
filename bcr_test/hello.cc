@@ -21,8 +21,11 @@ int main(int argc, char** argv) {
     std::cerr << "hello: cannot find message.txt\n";
     return 1;
   }
-  std::ostringstream message;
-  message << in.rdbuf();
-  std::cout << message.str();
-  return message.str() == "Hello from a bound executable\n" ? 0 : 1;
+  std::ostringstream contents;
+  contents << in.rdbuf();
+  // Without the line ending, which a checkout on Windows may make CRLF.
+  std::string message = contents.str();
+  while (!message.empty() && (message.back() == '\n' || message.back() == '\r')) message.pop_back();
+  std::cout << message << "\n";
+  return message == "Hello from a bound executable" ? 0 : 1;
 }
