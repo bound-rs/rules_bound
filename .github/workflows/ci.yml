@@ -34,7 +34,7 @@ jobs:
           workspaces: bound
       - name: Build bound
         working-directory: bound
-        run: cargo build --release --locked -p bound
+        run: cargo build --release --locked -p bound-cli
       - name: Set up Bazel on Windows
         if: runner.os == 'Windows'
         shell: bash
@@ -48,3 +48,25 @@ jobs:
         shell: bash
         # bazelisk (installed as `bazel` on GitHub's runners) reads .bazelversion.
         run: rules_bound/e2e/run.sh
+
+  released:
+    # bcr_test, the module the Bazel Central Registry tests releases with:
+    # the default toolchain, the released bound binaries.
+    name: released toolchain (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, ubuntu-24.04-arm, macos-latest, windows-latest, windows-11-arm]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Bazel on Windows
+        if: runner.os == 'Windows'
+        shell: bash
+        run: |
+          echo "BAZEL_SH=C:\Program Files\Git\bin\bash.exe" >> "$GITHUB_ENV"
+          echo "startup --output_user_root=C:/b" > "$HOME/.bazelrc"
+      - name: Test module
+        working-directory: bcr_test
+        shell: bash
+        run: USE_BAZEL_VERSION="$(cat ../.bazelversion)" bazel test //... --test_output=errors

@@ -47,16 +47,20 @@ report sales.csv
 ```starlark
 # MODULE.bazel
 bazel_dep(name = "rules_bound", version = "0.1.0")
+```
 
+rules_bound declares a toolchain of the released `bound` binaries for every
+pair of execution and target platform (Linux and Windows on x86_64 and
+aarch64, macOS on Apple silicon), downloaded when a build needs it, so a
+build on Linux can produce an executable for macOS or Windows, given a
+target of that platform to bind. It uses bound 0.1.0 unless your module
+chooses another release:
+
+```starlark
 bound = use_extension("@rules_bound//bound:extensions.bzl", "bound")
 bound.toolchain(version = "0.1.0")
 ```
 
-`bound.toolchain` downloads the released `bound` binaries and declares a
-toolchain for every pair of execution and target platform (Linux and
-Windows on x86_64 and aarch64, macOS on Apple silicon), so a build on
-Linux can produce an executable for macOS or Windows, given a target of
-that platform to bind.
 For a version rules_bound does not know yet, pass the archives' checksums:
 `bound.toolchain(version = "…", sha256s = {"linux_x86_64": "…", …})`.
 
@@ -311,8 +315,15 @@ rules_bound/e2e/run.sh         # bazel build and test, then the executables outs
 On Windows, run it from Git's bash, with `BAZEL_SH` set to that bash and a
 short output root (`startup --output_user_root=C:/b` in `~/.bazelrc`).
 
-To add a released version of bound, run `scripts/checksums.sh VERSION` and
-add its output to `bound/private/versions.bzl`.
+`bcr_test/` is the module the Bazel Central Registry tests each release
+with: a `cc_binary` bound by the default toolchain, the released binaries.
+CI runs it too.
+
+To release: add the bound version to `bound/private/versions.bzl` (the
+output of `scripts/checksums.sh VERSION`) and make it `DEFAULT_VERSION`,
+set the version in `MODULE.bazel`, then push a tag `vX.Y.Z`. A workflow
+publishes the source archive that the registry entry points to; `.bcr/`
+holds the templates for that entry.
 
 ## License
 

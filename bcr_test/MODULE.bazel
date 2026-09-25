@@ -1,0 +1,15 @@
+"""Tests rules_bound with its default toolchain, the released bound binaries.
+
+The Bazel Central Registry runs it for each release (.bcr/presubmit.yml).
+"""
+
+module(name = "rules_bound_bcr_test")
+
+bazel_dep(name = "rules_bound")
+local_path_override(
+    module_name = "rules_bound",
+    path = "..",
+)
+
+bazel_dep(name = "bazel_skylib", version = "1.9.2")
+bazel_dep(name = "rules_cc", version = "0.2.25")

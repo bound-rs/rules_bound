@@ -1,0 +1,33 @@
+name: Release
+
+# Pushing a tag vX.Y.Z publishes a GitHub release with the source archive
+# rules_bound-vX.Y.Z.tar.gz (holding a directory rules_bound-X.Y.Z), which
+# the module's entry in the Bazel Central Registry points to (.bcr/).
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Archive
+        run: |
+          archive="rules_bound-${GITHUB_REF_NAME}.tar.gz"
+          git archive --format=tar.gz --prefix="rules_bound-${GITHUB_REF_NAME#v}/" -o "$archive" "$GITHUB_REF_NAME"
+          echo "integrity: sha256-$(openssl dgst -sha256 -binary "$archive" | base64 -w0)"
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" "rules_bound-${GITHUB_REF_NAME}.tar.gz" \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "rules_bound ${GITHUB_REF_NAME#v}" \
+            --notes "rules_bound ${GITHUB_REF_NAME#v}, for bound. In MODULE.bazel: bazel_dep(name = \"rules_bound\", version = \"${GITHUB_REF_NAME#v}\")"
