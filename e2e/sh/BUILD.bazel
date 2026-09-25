@@ -1,0 +1,17 @@
+load("@rules_bound//bound:defs.bzl", "bound_binary")
+load("@rules_shell//shell:sh_binary.bzl", "sh_binary")
+
+sh_binary(
+    name = "greet",
+    srcs = ["greet.sh"],
+    data = ["greeting.txt"],
+    visibility = ["//visibility:public"],
+    deps = ["@bazel_tools//tools/bash/runfiles"],
+)
+
+bound_binary(
+    name = "greet_bound",
+    binary = ":greet",
+    bound_args = ["from bound"],
+    visibility = ["//visibility:public"],
+)

@@ -1,0 +1,21 @@
+load("@bazel_skylib//:bzl_library.bzl", "bzl_library")
+
+bzl_library(
+    name = "rules",
+    srcs = [
+        "binary.bzl",
+        "context.bzl",
+        "layout.bzl",
+    ],
+    visibility = ["//bound:__subpackages__"],
+)
+
+bzl_library(
+    name = "repositories",
+    srcs = [
+        "platforms.bzl",
+        "repositories.bzl",
+        "versions.bzl",
+    ],
+    visibility = ["//bound:__subpackages__"],
+)

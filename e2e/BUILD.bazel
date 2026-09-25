@@ -1,0 +1,15 @@
+load("@rules_shell//shell:sh_test.bzl", "sh_test")
+
+# The bound executables used as tools inside a test: they must find their
+# own files whatever runfiles variables the test's environment holds.
+sh_test(
+    name = "tools_test",
+    srcs = ["tools_test.sh"],
+    data = [
+        "//cc:hello_bound",
+        "//custom:configured",
+        "//py:report_bound",
+        "//sh:greet_bound",
+    ],
+    deps = ["@bazel_tools//tools/bash/runfiles"],
+)

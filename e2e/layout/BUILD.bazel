@@ -1,0 +1,79 @@
+# Layouts of the kind language rules produce with rules_bound's BoundInfo:
+# see py.bzl and js.bzl.
+
+load("@rules_bound//bound:defs.bzl", "bound_binary")
+load("@rules_python//python:py_binary.bzl", "py_binary")
+load("@rules_python//python:py_library.bzl", "py_library")
+load(":js.bzl", "js_bound_layout", "js_package")
+load(":py.bzl", "py_bound_layout")
+
+# Python: the interpreter, and the application with its dependencies in its
+# site-packages.
+
+py_library(
+    name = "greeting",
+    srcs = ["greeting/__init__.py"],
+    data = ["greeting/greeting.txt"],
+    imports = ["."],
+)
+
+py_binary(
+    name = "app_bin",
+    srcs = [
+        "app/__init__.py",
+        "app/main.py",
+    ],
+    imports = ["."],
+    # The packages have their __init__.py files.
+    legacy_create_init = 0,
+    main = "app/main.py",
+    deps = [
+        ":greeting",
+        "@e2e_pypi//idna",
+    ],
+)
+
+py_bound_layout(
+    name = "app_layout",
+    binary = ":app_bin",
+)
+
+bound_binary(
+    name = "py_app",
+    binary = ":app_layout",
+    bound_args = ["from bound"],
+    visibility = ["//visibility:public"],
+)
+
+# JavaScript: node, and the application with a pnpm-style node_modules tree.
+
+js_package(
+    name = "b",
+    package_name = "b",
+    srcs = glob(["js/b/**"]),
+    root = "js/b",
+    version = "2.0.0",
+)
+
+js_package(
+    name = "a",
+    package_name = "a",
+    srcs = glob(["js/a/**"]),
+    root = "js/a",
+    version = "1.0.0",
+    deps = [":b"],
+)
+
+js_bound_layout(
+    name = "js_layout",
+    srcs = ["js/main.js"],
+    entry = "main.js",
+    deps = [":a"],
+)
+
+bound_binary(
+    name = "js_app",
+    binary = ":js_layout",
+    bound_args = ["from bound"],
+    visibility = ["//visibility:public"],
+)

@@ -1,0 +1,7 @@
+common --enable_platform_specific_config
+
+# A py_binary's launcher as a shell script, so that bound executables of
+# Python programs need no Python installed to start. (Windows starts
+# py_binary through Bazel's native launcher instead.)
+common:linux --@rules_python//python/config_settings:bootstrap_impl=script
+common:macos --@rules_python//python/config_settings:bootstrap_impl=script

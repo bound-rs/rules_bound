@@ -1,0 +1,14 @@
+load("@rules_shell//shell:sh_binary.bzl", "sh_binary")
+load(":defs.bzl", "configured_tool")
+
+sh_binary(
+    name = "tool",
+    srcs = ["tool.sh"],
+)
+
+configured_tool(
+    name = "configured",
+    greeting = "Hi",
+    tool = ":tool",
+    visibility = ["//visibility:public"],
+)
