@@ -7,7 +7,7 @@ fills. The root module chooses:
 bound = use_extension("@rules_bound//bound:extensions.bzl", "bound")
 
 # A released version (checksums built into rules_bound, or given here):
-bound.toolchain(version = "0.1.0")
+bound.toolchain(version = "0.2.0")
 
 # Or binaries built locally, for the host platform only, e.g. from a bound
 # checkout (a path relative to the root module, or absolute):
@@ -28,7 +28,7 @@ load("//bound/private:versions.bzl", "DEFAULT_VERSION", "URL_TEMPLATE", "VERSION
 _toolchain = tag_class(
     doc = "Use a released version of bound.",
     attrs = {
-        "version": attr.string(mandatory = True, doc = "The version, such as 0.1.0."),
+        "version": attr.string(mandatory = True, doc = "The version, such as 0.2.0."),
         "sha256s": attr.string_dict(
             doc = "SHA-256 of each platform's archive (keys such as linux_x86_64, macos_aarch64, windows_x86_64), for versions rules_bound does not know. Platforms left out get no toolchain.",
         ),
