@@ -1,8 +1,13 @@
 // Reports where node runs and what PATH holds, relative to the bundle:
 // rules_bound's cwd = bundle_path(...) and list variables, seen from inside.
+const fs = require("fs");
 const path = require("path");
 const root = process.env.BOUND_ROOT;
 const entries = process.env.PATH.split(path.delimiter);
 const relative = (p) => path.relative(root, p).split(path.sep).join("/");
-const nodeFirst = entries[0] === path.dirname(process.execPath);
+// Whether two paths name the same directory, however each is spelled: on
+// Windows bound's paths start with BOUND_CACHE_DIR as the caller wrote it
+// (C:/... from Git Bash), while node's own path has backslashes.
+const same = (a, b) => fs.realpathSync.native(a) === fs.realpathSync.native(b);
+const nodeFirst = same(entries[0], path.dirname(process.execPath));
 console.log(`cwd=${relative(process.cwd())} | node first on PATH: ${nodeFirst} | last on PATH: ${relative(entries[entries.length - 1])}`);
