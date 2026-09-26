@@ -1,0 +1,6 @@
+# Analysis tests of bind and bound_binary: cwd, how a caller's bindings
+# combine with a BoundInfo's, and the refusals (see tests.bzl).
+
+load(":tests.bzl", "bind_test_suite")
+
+bind_test_suite(name = "bind_test")
