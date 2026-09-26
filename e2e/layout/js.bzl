@@ -10,6 +10,8 @@ each package sees its own dependencies and nothing else. The program is
 
 The links are collected in depsets and computed when the action runs
 (`bound_layout.symlinks`), as a ruleset would for large dependency graphs.
+Node's directory comes first on PATH (`env_prepend`), so that the programs
+node starts find the same node.
 (On Windows, bound makes them symbolic links, or junctions where the user
 may not create those, as pnpm does.) A test fixture of rules_bound, not part
 of it.
@@ -97,6 +99,7 @@ def _js_bound_layout_impl(ctx):
         ],
         program = program,
         args = [bundle_path("app/" + ctx.attr.entry)],
+        env_prepend = {"PATH": [bundle_path(program.rsplit("/", 1)[0])]},
     )]
 
 js_bound_layout = rule(

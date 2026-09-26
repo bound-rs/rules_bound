@@ -12,6 +12,8 @@ load(
     "RUNTIME_ARGS",
     "bound_layout",
     "bundle_path",
+    "check_lists",
+    "check_names",
     "raw",
     "relative_link",
     "rlocation",
@@ -226,8 +228,18 @@ def bound_info_of(executable, runfiles = None):
         args = info.args,
         env = info.env,
         unset = info.unset,
+        env_prepend = info.env_prepend,
+        env_append = info.env_append,
         runfiles_dir = info.runfiles_dir,
     )
+
+def _render_cwd(cwd):
+    """The `--cwd` of `bind`'s `cwd`."""
+    if type(cwd) == "string" and cwd in ("inherit", "bundle"):
+        return cwd
+    if getattr(cwd, "bound_kind", None) == "bundle_path":
+        return "@bundle:" + cwd.path
+    fail("bound: cwd: expected \"inherit\", \"bundle\" or bundle_path(DIR), got {}".format(cwd))
 
 def _bind(
         ctx,
@@ -239,11 +251,16 @@ def _bind(
         args = [],
         env = {},
         unset = [],
+        env_prepend = {},
+        env_append = {},
         bundle = "shared",
         cwd = "inherit",
         runfiles_env = None,
         mnemonic = "Bound"):
     info = bound_info_of(executable, runfiles)
+    rendered_cwd = _render_cwd(cwd)
+    env_prepend = check_lists("bind env_prepend", env_prepend)
+    env_append = check_lists("bind env_append", env_append)
     runfiles_dir = info.runfiles_dir
     if runfiles_env == None:
         runfiles_env = runfiles_dir != None
@@ -252,17 +269,40 @@ def _bind(
     if not output:
         output = ctx.actions.declare_file(ctx.label.name + toolchain.exe_suffix)
 
-    # Values: the BoundInfo's, then the caller's, who may override a variable.
+    # Values: the BoundInfo's, then the caller's. A caller's binding of a
+    # name replaces the BoundInfo's binding of that name, whatever its kind,
+    # except that list entries combine: the caller's prepend entries go
+    # before the BoundInfo's and its append entries after them. Names
+    # compare case-insensitively, as bound compares them.
     files = []
     rendered_args = [_render(value, runfiles_dir, files, "args") for value in info.args + list(args)]
-    variables = dict(info.env)
+    caller_lists = {name.upper(): name for name in env_prepend.keys() + env_append.keys()}
+    check_names("bind", [env.keys(), list(unset), caller_lists.values()])
+    replaced = {name.upper(): True for name in env.keys() + list(unset) + caller_lists.values()}
+    variables = {name: value for name, value in info.env.items() if name.upper() not in replaced}
     variables.update(env)
-    removed = [name for name in info.unset if name not in env]
+    removed = [name for name in info.unset if name.upper() not in replaced]
     for name in unset:
-        variables.pop(name, None)
         if name not in removed:
             removed.append(name)
     rendered_env = ["{}={}".format(name, _render(value, runfiles_dir, files, "env")) for name, value in variables.items()]
+    lists = {}
+    inherited = [(n, v, True) for n, v in info.env_prepend.items()] + [(n, v, False) for n, v in info.env_append.items()]
+    for name, values, before in inherited:
+        if name.upper() in replaced and name.upper() not in caller_lists:
+            continue
+        name, prepended, appended = lists.get(name.upper(), (name, [], []))
+        lists[name.upper()] = (name, prepended + values, appended) if before else (name, prepended, appended + values)
+    for name, values in env_prepend.items():
+        name, prepended, appended = lists.get(name.upper(), (name, [], []))
+        lists[name.upper()] = (name, values + prepended, appended)
+    for name, values in env_append.items():
+        name, prepended, appended = lists.get(name.upper(), (name, [], []))
+        lists[name.upper()] = (name, prepended, appended + values)
+    rendered_lists = []
+    for name, prepended, appended in lists.values():
+        rendered_lists += [("--env-prepend", "{}={}".format(name, _render(value, runfiles_dir, files, "env_prepend"))) for value in prepended]
+        rendered_lists += [("--env-append", "{}={}".format(name, _render(value, runfiles_dir, files, "env_append"))) for value in appended]
 
     entries = list(info.layout)
     if files:
@@ -283,7 +323,7 @@ def _bind(
     command.add("-o", output)
     command.add("--include-list", includes)
     command.add("--bundle", bundle)
-    command.add("--cwd", cwd)
+    command.add("--cwd", rendered_cwd)
     if runfiles_env:
         # The bundled tree, whatever runfiles variables the caller has
         # (such as those of a `bazel run` or `bazel test` around it).
@@ -295,6 +335,8 @@ def _bind(
         command.add("--env", binding)
     for name in removed:
         command.add("--unset", name)
+    for option, value in rendered_lists:
+        command.add(option, value)
     command.add("--")
     command.add("@bundle:" + info.program)
     command.add_all(rendered_args)
@@ -323,8 +365,9 @@ def bound_context(ctx):
       A struct with:
 
       * `bind(executable, layout = [], runfiles = None, output = None,
-        args = [], env = {}, unset = [], bundle = "shared", cwd = "inherit",
-        runfiles_env = None, mnemonic = "Bound")`: registers the action that
+        args = [], env = {}, unset = [], env_prepend = {}, env_append = {},
+        bundle = "shared", cwd = "inherit", runfiles_env = None,
+        mnemonic = "Bound")`: registers the action that
         writes a bound executable and returns a struct with `executable` (the
         File), `program` (the program's path in the bundle) and
         `runfiles_dir` (the runfiles tree's path in the bundle, or None).
@@ -344,9 +387,20 @@ def bound_context(ctx):
         * `env`: variables to set, with values like `args`; they override
           those of the BoundInfo.
         * `unset`: variables to remove from the inherited environment.
+        * `env_prepend`, `env_append`: list variables such as `PATH`, each
+          a name and a list of entries (values like `args`, but not
+          `RUNTIME_ARGS`) put before or after the caller's value, joined
+          with the platform's separator. The BoundInfo's entries of a name
+          sit inside the caller's (its prepend entries after the caller's,
+          its append entries before). A name the caller binds any other way
+          replaces the BoundInfo's binding of it, and one party cannot bind
+          a name two ways; names compare case-insensitively. Needs bound
+          0.2.0 or later.
         * `bundle`: "shared" (extracted once into the user's cache,
           read-only) or "private" (extracted for every run).
-        * `cwd`: "inherit" (the caller's directory) or "bundle".
+        * `cwd`: "inherit" (the caller's directory), "bundle", or
+          `bundle_path(DIR)`: a directory in the bundle, which the layout
+          must hold (needs bound 0.2.0 or later).
         * `runfiles_env`: set RUNFILES_DIR and JAVA_RUNFILES to the bundled
           runfiles tree and remove RUNFILES_MANIFEST_FILE and
           RUNFILES_MANIFEST_ONLY. By default, when the layout has a runfiles

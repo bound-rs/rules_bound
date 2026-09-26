@@ -77,3 +77,20 @@ bound_binary(
     bound_args = ["from bound"],
     visibility = ["//visibility:public"],
 )
+
+# The same layout, run in a bundled directory, with an entry appended to the
+# PATH the layout prepends node's directory to.
+
+js_bound_layout(
+    name = "where_layout",
+    srcs = ["js/where.js"],
+    entry = "where.js",
+)
+
+bound_binary(
+    name = "js_where",
+    binary = ":where_layout",
+    bound_env_append = {"PATH": ["@bundle:app"]},
+    cwd = "@bundle:app",
+    visibility = ["//visibility:public"],
+)

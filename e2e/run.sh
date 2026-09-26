@@ -17,7 +17,7 @@ exe=""
 case "$(uname -s)" in MINGW* | MSYS* | CYGWIN*) exe=".exe" ;; esac
 work="$(mktemp -d)"
 trap 'chmod -R u+w "$work" 2>/dev/null; rm -rf "$work"' EXIT
-for target in sh/greet_bound py/report_bound cc/hello_bound custom/configured layout/py_app layout/js_app; do
+for target in sh/greet_bound py/report_bound cc/hello_bound custom/configured layout/py_app layout/js_app layout/js_where; do
   cp "$bin/$target$exe" "$work/"
 done
 mkdir "$work/elsewhere"
@@ -48,5 +48,6 @@ for run in first second; do
   expect "mode=configured config=greeting = Hi args=a b @literal" "../configured$exe" a b
   expect "Hello from site-packages | idna 3.10: xn--bcher-kva.example | installed layout | from bound x" "../py_app$exe" x
   expect "a 1.0.0 uses b 2.0.0 | a resolved in node_modules/.store | b is not visible | from bound x" "../js_app$exe" x
+  expect "cwd=app | node first on PATH: true | last on PATH: app" "../js_where$exe"
 done
 echo "e2e: all checks passed"

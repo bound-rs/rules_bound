@@ -46,19 +46,20 @@ report sales.csv
 
 ```starlark
 # MODULE.bazel
-bazel_dep(name = "rules_bound", version = "0.1.0")
+bazel_dep(name = "rules_bound", version = "0.2.0")
 ```
 
 rules_bound declares a toolchain of the released `bound` binaries for every
 pair of execution and target platform (Linux and Windows on x86_64 and
 aarch64, macOS on Apple silicon), downloaded when a build needs it, so a
 build on Linux can produce an executable for macOS or Windows, given a
-target of that platform to bind. It uses bound 0.1.0 unless your module
-chooses another release:
+target of that platform to bind. It uses bound 0.2.0 unless your module
+chooses another release (list variables and `cwd` in the bundle need 0.2.0
+or later; an older bound fails on the unknown option):
 
 ```starlark
 bound = use_extension("@rules_bound//bound:extensions.bzl", "bound")
-bound.toolchain(version = "0.1.0")
+bound.toolchain(version = "0.2.0")
 ```
 
 For a version rules_bound does not know yet, pass the archives' checksums:
@@ -82,8 +83,10 @@ or declare a toolchain of your own with `bound_toolchain` (see
 | `bound_args` | Arguments bound into the executable, after those of the `BoundInfo` and before the arguments given at run time unless `@args` marks their place. A whole-argument `$(location X)`, `$(rootpath X)`, `$(execpath X)` or `$(rlocationpath X)` becomes the absolute path of the bundled file at run time (it needs a runfiles tree). Other values use [bound's syntax](https://github.com/bound-rs/bound#reference): `@args`, `@bundle:PATH`, and `@@TEXT` for a literal leading `@`. |
 | `bound_env` | Environment variables set for the program, with values like `bound_args`. |
 | `unset_env` | Environment variables removed from what the program inherits. |
+| `bound_env_prepend` | List variables, such as `PATH`, each with entries put before the caller's value (joined with the platform's separator, `:` or `;`), with values like `bound_args`. |
+| `bound_env_append` | List variables with entries put after the caller's value. |
 | `bundle` | `"shared"` (default): the bundle is extracted once, into the user's cache, read-only, and reused by every run. `"private"`: a new copy for every run, removed afterwards. |
-| `cwd` | `"inherit"` (default): the program runs in the caller's working directory. `"bundle"`: in the bundle directory. |
+| `cwd` | `"inherit"` (default): the program runs in the caller's working directory. `"bundle"`: in the bundle directory. `"@bundle:DIR"`: in the bundled directory `DIR`. |
 | `runfiles_env` | When the bundle has a runfiles tree, point `RUNFILES_DIR` and `JAVA_RUNFILES` at it and remove `RUNFILES_MANIFEST_FILE` and `RUNFILES_MANIFEST_ONLY`, whatever the caller's environment holds (default `True`). |
 
 The output is named after the target (`.exe` is added for Windows).
@@ -115,6 +118,7 @@ starts:
 | `program` | The path in the bundle of the program to run, such as `python/bin/python3` or `node/node.exe`. |
 | `args` | Arguments that start it, such as `["-I", "-m", "app.main"]`; those of `bound_binary` and of the caller follow. |
 | `env`, `unset` | Variables to set (values like `args`), and to remove. |
+| `env_prepend`, `env_append` | List variables such as `PATH`: each name with a list of entries (values like `args`, but not `RUNTIME_ARGS`) put before or after the caller's value, joined with the platform's separator. A name is bound one way only. |
 | `runfiles_dir` | The path in the bundle of a runfiles tree, if the layout has one (for data a program finds through a runfiles library, `runfile()` values and `bound_binary`'s `data`); `RUNFILES_DIR` then points at it. |
 
 A rule returns one next to its other providers: `bound_binary` then binds
@@ -144,7 +148,7 @@ makes a link a junction (to a directory) or a hard link (to a file) for
 users who lack it: what pnpm does, and what Node.js and other programs
 follow like links.
 
-Values of `args` and `env`: strings are literal; `bundle_path(path)` is the
+Values of `args`, `env` and list entries: strings are literal; `bundle_path(path)` is the
 absolute path of `path` in the extracted bundle; `runfile(rlocationpath)`
 that of a file in the runfiles tree, as is a File; `raw(text)` is bound's
 own syntax; `RUNTIME_ARGS` marks where the run-time arguments go.
@@ -211,6 +215,8 @@ def _js_bound_layout_impl(ctx):
         ],
         program = "node/bin/node",
         args = [bundle_path("app/main.js")],
+        # Programs node starts find the same node.
+        env_prepend = {"PATH": [bundle_path("node/bin")]},
     )]
 ```
 
@@ -245,14 +251,21 @@ configured_tool = rule(
 ```
 
 `bind(executable, layout = [], runfiles = None, output = None, args = [],
-env = {}, unset = [], bundle = "shared", cwd = "inherit", runfiles_env =
-None, mnemonic = "Bound")`:
+env = {}, unset = [], env_prepend = {}, env_append = {}, bundle = "shared",
+cwd = "inherit", runfiles_env = None, mnemonic = "Bound")`:
 
 * `executable`: a Target (its `BoundInfo` if it has one, otherwise the
   program and its runfiles), a File (that program alone), or a `BoundInfo`.
 * `layout`: more entries; `runfiles`: more runfiles, for the runfiles tree.
 * `args` and `env` follow those of the `BoundInfo` (a variable of `env`
   overrides one of the `BoundInfo`).
+* `env_prepend` and `env_append` wrap the `BoundInfo`'s entries of the same
+  name: the caller's prepend entries come first and its append entries
+  last. A name the caller sets or unsets replaces the `BoundInfo`'s binding
+  of it, whatever its kind, and one party binds a name one way only. Names
+  compare case-insensitively, as bound compares them.
+* `cwd`: `"inherit"`, `"bundle"`, or `bundle_path(DIR)` for a directory the
+  layout holds.
 * `runfiles_env`: by default, when the layout has a runfiles tree.
 * `output`: the File to write; by default the rule's name, with `.exe` for
   Windows.

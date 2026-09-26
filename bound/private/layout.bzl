@@ -22,8 +22,10 @@ def bundle_path(path):
       path: a `/`-separated path in the bundle, such as `python/lib`.
 
     Returns:
-      A value for `args` or `env`, replaced at run time by the absolute path
-      of `path` in the extracted bundle. Something must be bundled there.
+      A value for `args`, `env`, `env_prepend` and `env_append`, replaced at
+      run time by the absolute path of `path` in the extracted bundle, or the
+      `cwd` of `bind`: the bundled directory `path`. Something must be
+      bundled there.
     """
     return struct(bound_kind = "bundle_path", path = _check_path(path, "bundle_path"))
 
@@ -281,16 +283,61 @@ bound_layout = struct(
 
 # How to bind a program.
 
-def _bound_info_init(layout, program, args = [], env = {}, unset = [], runfiles_dir = None):
+def check_lists(what, lists):
+    """Checks list variables: name -> non-empty list of values, no RUNTIME_ARGS.
+
+    Args:
+      what: where the lists come from, for messages.
+      lists: the dict to check.
+
+    Returns:
+      The dict, with its lists copied.
+    """
+    checked = {}
+    for name, values in lists.items():
+        if type(values) != "list":
+            fail("bound: {}: the value of {} must be a list of entries".format(what, name))
+        if not values:
+            fail("bound: {}: {} has no entries".format(what, name))
+        for value in values:
+            if getattr(value, "bound_kind", None) == "runtime_args":
+                fail("bound: {}: RUNTIME_ARGS has no place in a list variable".format(what))
+        checked[name] = list(values)
+    return checked
+
+def check_names(what, groups):
+    """Fails if two of `groups` (lists of variable names) share a name.
+
+    Names compare case-insensitively, as bound compares them.
+
+    Args:
+      what: where the names come from, for messages.
+      groups: lists of names, each bound one way.
+    """
+    seen = {}
+    for group in groups:
+        keys = {name.upper(): name for name in group}
+        for key, name in keys.items():
+            if key in seen:
+                fail("bound: {}: the variable {} is bound more than one way (with env, unset, env_prepend or env_append; names compare case-insensitively)".format(what, name))
+        seen.update(keys)
+
+def _bound_info_init(layout, program, args = [], env = {}, unset = [], env_prepend = {}, env_append = {}, runfiles_dir = None):
     for entry in layout:
         if not getattr(entry, "bound_layout", None):
             fail("bound: BoundInfo layout: {} is not a layout entry (use bound_layout.files, .file, .symlink, ...)".format(entry))
+    env_prepend = check_lists("BoundInfo env_prepend", env_prepend)
+    env_append = check_lists("BoundInfo env_append", env_append)
+    lists = {name.upper(): name for name in env_prepend.keys() + env_append.keys()}
+    check_names("BoundInfo", [env.keys(), list(unset), lists.values()])
     return {
         "layout": list(layout),
         "program": _check_path(program, "BoundInfo program"),
         "args": list(args),
         "env": dict(env),
         "unset": list(unset),
+        "env_prepend": env_prepend,
+        "env_append": env_append,
         "runfiles_dir": _check_path(runfiles_dir, "BoundInfo runfiles_dir") if runfiles_dir != None else None,
     }
 
@@ -310,6 +357,8 @@ registers no action: rules pay nothing unless something binds them.
         "args": "Arguments that start the program, such as an interpreter's options and the module to run. Strings are literal; `bundle_path()`, `runfile()`, `raw()` and `RUNTIME_ARGS` as for `bind`. The arguments given to `bind` (and `bound_args`) follow them.",
         "env": "A dict of variables to set, with values like `args`.",
         "unset": "A list of variables to remove from what the program inherits.",
+        "env_prepend": "A dict of list variables, such as `PATH`, to lists of entries put before the caller's value (joined with the platform's separator), with values like `args` except `RUNTIME_ARGS`. Needs bound 0.2.0 or later.",
+        "env_append": "A dict of list variables to lists of entries put after the caller's value, like `env_prepend`.",
         "runfiles_dir": "The path in the bundle of a runfiles tree (a `bound_layout.runfiles` entry), or None. With one, `runfile()` values, File values and `bound_binary`'s `data` go there, and RUNFILES_DIR points to it (unless `runfiles_env = False`).",
     },
     init = _bound_info_init,
