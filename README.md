@@ -46,20 +46,20 @@ report sales.csv
 
 ```starlark
 # MODULE.bazel
-bazel_dep(name = "rules_bound", version = "0.2.0")
+bazel_dep(name = "rules_bound", version = "0.2.1")
 ```
 
 rules_bound declares a toolchain of the released `bound` binaries for every
 pair of execution and target platform (Linux and Windows on x86_64 and
 aarch64, macOS on Apple silicon), downloaded when a build needs it, so a
 build on Linux can produce an executable for macOS or Windows, given a
-target of that platform to bind. It uses bound 0.2.0 unless your module
+target of that platform to bind. It uses bound 0.2.1 unless your module
 chooses another release (list variables and `cwd` in the bundle need 0.2.0
 or later; an older bound fails on the unknown option):
 
 ```starlark
 bound = use_extension("@rules_bound//bound:extensions.bzl", "bound")
-bound.toolchain(version = "0.2.0")
+bound.toolchain(version = "0.2.1")
 ```
 
 For a version rules_bound does not know yet, pass the archives' checksums:

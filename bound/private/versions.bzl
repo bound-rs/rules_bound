@@ -21,9 +21,16 @@ VERSIONS = {
         "windows_aarch64": "926a535e6d80ceb5bab8731bddd4a075e9a2a16f9ca727a277e6107e286edd10",
         "windows_x86_64": "34cb4a731735ae5c6a17322734eb55806cbb4858a94133d8dc02c440f2ccf51b",
     },
+    "0.2.1": {
+        "linux_aarch64": "67842c706584400c70f18b3bfc9c1f3164c27035771d26d675c50d1c08452fe7",
+        "linux_x86_64": "778aa039b026d09ffdeed7f0997f6f533f22430603884e17484507cb805a7130",
+        "macos_aarch64": "4eb6fade0928ae382ca64274c7981b598afb8ddc91c4440d17ee7fb07636b727",
+        "windows_aarch64": "011a68e40bccb70ad3ef136b1ddce61a3f6acf228d36a1d34fab2df8ceb4364b",
+        "windows_x86_64": "64c598a288c40e640cd93652f90f6b98d5078a2a238086fcc1a62db9a42cf4aa",
+    },
 }
 
 # The version used when the root module does not choose one.
-DEFAULT_VERSION = "0.2.0"
+DEFAULT_VERSION = "0.2.1"
 
 URL_TEMPLATE = "https://github.com/bound-rs/bound/releases/download/v{version}/bound-{version}-{platform}.{archive}"
